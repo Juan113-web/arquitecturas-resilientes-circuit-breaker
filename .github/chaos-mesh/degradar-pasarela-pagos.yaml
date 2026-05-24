@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: degradar-pasarela-pagos
+  namespace: produccion
+spec:
+  action: delay
+  mode: all
+  selector:
+    labelSelectors:
+      app: pasarela-pagos
+  delay:
+    latency: "3000ms"
+    correlation: "100"
+    jitter: "500ms"
+  duration: "60s"
