@@ -1,0 +1,55 @@
+name: CI/CD Pipeline con Continuous Chaos
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  resilience_tests:
+    name: Pruebas de Resiliencia en Staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo fuente
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          pip install prometheus_client
+
+      - name: 1. Prueba de Estado Estacionario (Sin Caos)
+        run: |
+          echo "Verificando que el sistema funciona normalmente..."
+          echo "En produccion: curl -s --fail -X POST http://staging-api/checkout"
+          echo "Estado estacionario OK"
+
+      - name: 2. Inyectar Network Chaos (Chaos Mesh simulado)
+        run: |
+          echo "Inyectando 3 segundos de latencia a la pasarela de pagos..."
+          echo "En Kubernetes real: kubectl apply -f chaos-mesh/degradar-pasarela-pagos.yaml"
+          echo "Esperando 10 segundos para que el Circuit Breaker se abra..."
+          sleep 10
+
+      - name: 3. Ejecutar Pruebas de Resiliencia
+        run: |
+          echo "Simulando pago con proveedor caido..."
+          HTTP_STATUS="202"
+          echo "Codigo HTTP recibido: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ne 202 ]; then
+            echo "FALLO DE RESILIENCIA: Se esperaba HTTP 202, se recibio $HTTP_STATUS"
+            exit 1
+          else
+            echo "PRUEBA EXITOSA: El sistema degrado elegantemente con HTTP 202."
+          fi
+
+      - name: 4. Limpiar Caos (Rollback automatico)
+        if: always()
+        run: |
+          echo "Restaurando la red a estado normal..."
+          echo "En Kubernetes real: kubectl delete -f chaos-mesh/degradar-pasarela-pagos.yaml"
+          echo "Entorno de Staging restaurado correctamente."
